@@ -1,8 +1,7 @@
 import telebot
-from TOKEN import TOKEN
 from collections import deque
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot("8464194521:AAH-Gd0Du3ndVeq0dzO7WqcqyiAaUki99hM")
 
 # Список админов
 ADMIN_IDS = [5593462428, ] 
