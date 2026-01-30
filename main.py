@@ -6,7 +6,7 @@ bot = telebot.TeleBot("8464194521:AAH-Gd0Du3ndVeq0dzO7WqcqyiAaUki99hM")
 
 ADMIN_IDS = [5593462428] 
 BANNED_IDS = set() # Список забаненных (в памяти, сбросится при перезапуске)
-CHANNEL_ID = "@твой_канал" # ID канала (например, @my_channel или -100...)
+CHANNEL_ID = "-1003888214365" # ID канала (например, @my_channel или -100...)
 
 posts_queue = deque()
 current_post = None
