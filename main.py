@@ -1,25 +1,23 @@
 import telebot
 from collections import deque
 
+# Замени токен на свой. Не забудь добавить бота в админы канала!
 bot = telebot.TeleBot("8464194521:AAH-Gd0Du3ndVeq0dzO7WqcqyiAaUki99hM")
 
-# Список админов
-ADMIN_IDS = [5593462428, ] 
+ADMIN_IDS = [5593462428] 
+BANNED_IDS = set() # Список забаненных (в памяти, сбросится при перезапуске)
+CHANNEL_ID = "@твой_канал" # ID канала (например, @my_channel или -100...)
 
-# Очередь постов: хранит объекты сообщений
 posts_queue = deque()
-# Текущий пост, который сейчас видит админ
 current_post = None
 
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
 def send_next_to_admins():
-    """Берет следующий пост из очереди и шлет админам"""
     global current_post
     if posts_queue:
-        current_post = posts_queue.popleft() # Берем самый старый пост
-        
+        current_post = posts_queue.popleft()
         username = f"@{current_post.from_user.username}" if current_post.from_user.username else "Без ника"
         info = f"🔔 Новый пост от {username} (ID: {current_post.from_user.id}):\n\n"
 
@@ -44,13 +42,29 @@ def start_handler(message):
     else:
         bot.reply_to(message, "Отправь пост, и он попадет в очередь на модерацию.")
 
-@bot.message_handler(commands=['adddddmiiiiinnnnnnstart5050505050505050'])
-def secret_admin_login(message):
-    if message.from_user.id not in ADMIN_IDS:
-        ADMIN_IDS.append(message.from_user.id)
-        bot.reply_to(message, "✅ Теперь ты администратор!")
+# --- БЛОК АДМИН-КОМАНД ---
+
+@bot.message_handler(commands=['ban'])
+def ban_user(message):
+    if not is_admin(message.from_user.id): return
+    args = message.text.split()
+    if len(args) > 1 and args[1].isdigit():
+        user_id = int(args[1])
+        BANNED_IDS.add(user_id)
+        bot.reply_to(message, f"🚫 Пользователь {user_id} заблокирован.")
     else:
-        bot.reply_to(message, "Ты уже администратор.")
+        bot.reply_to(message, "Используй: /ban [ID]")
+
+@bot.message_handler(commands=['unban'])
+def unban_user(message):
+    if not is_admin(message.from_user.id): return
+    args = message.text.split()
+    if len(args) > 1 and args[1].isdigit():
+        user_id = int(args[1])
+        BANNED_IDS.discard(user_id)
+        bot.reply_to(message, f"✅ Пользователь {user_id} разблокирован.")
+    else:
+        bot.reply_to(message, "Используй: /unban [ID]")
 
 @bot.message_handler(commands=['yes', 'no'])
 def moderation_handler(message):
@@ -61,27 +75,39 @@ def moderation_handler(message):
         bot.reply_to(message, "Сейчас нет постов на проверку.")
         return
 
-    # Логика одобрения или отказа
     if message.text.startswith('/yes'):
-        bot.send_message(current_post.chat.id, "✅ Ваш пост одобрен!")
-        bot.reply_to(message, "Одобрено. Присылаю следующий...")
+        # Публикация в канал
+        try:
+            if current_post.content_type == 'text':
+                bot.send_message(CHANNEL_ID, current_post.text)
+            elif current_post.content_type == 'photo':
+                bot.send_photo(CHANNEL_ID, current_post.photo[-1].file_id, caption=current_post.caption)
+            
+            bot.send_message(current_post.chat.id, "✅ Ваш пост одобрен и опубликован!")
+            bot.reply_to(message, "Опубликовано в канал. Присылаю следующий...")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка публикации: {e}")
     else:
         args = message.text.split(maxsplit=1)
         reason = args[1] if len(args) > 1 else "без объяснения причин"
         bot.send_message(current_post.chat.id, f"❌ Ваш пост отклонен.\nПричина: {reason}")
         bot.reply_to(message, "Отклонено. Присылаю следующий...")
 
-    # Переходим к следующему посту
     send_next_to_admins()
+
+# --- ОБРАБОТКА ВХОДЯЩИХ ПОСТОВ ---
 
 @bot.message_handler(content_types=['text', 'photo'])
 def handle_incoming_post(message):
     if is_admin(message.from_user.id): return
+    
+    # Проверка на бан
+    if message.from_user.id in BANNED_IDS:
+        bot.reply_to(message, "⛔ Вы заблокированы и не можете отправлять посты.")
+        return
 
-    # Добавляем сообщение в очередь
     posts_queue.append(message)
     
-    # Если сейчас ничего не проверяется, сразу шлем админу
     global current_post
     if current_post is None:
         bot.reply_to(message, "📥 Пост отправлен админам!")
